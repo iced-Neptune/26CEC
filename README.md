@@ -1,6 +1,6 @@
 # 26CEC 碘钟反应光敏监测系统
 
-> 一个用于采集 Arduino 光敏传感器数据、实时监测化学反应进程的桌面工具。
+> 一个用于采集 Arduino 光敏传感器数据、实时监测化学反应进程的桌面工具。 
 > 传承于22届太阳学长（beautiful forever）让我们在整个项目最开始对崇高的太阳kami展示敬意好吗（bushi
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
