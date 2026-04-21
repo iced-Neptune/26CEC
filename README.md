@@ -1,6 +1,7 @@
 # 26CEC 碘钟反应光敏监测系统
 
 > 一个用于采集 Arduino 光敏传感器数据、实时监测化学反应进程的桌面工具。
+ 
 > 传承于22届太阳学长（beautiful forever）让我们在整个项目最开始对崇高的太阳kami展示敬意好吗（bushi
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
@@ -23,7 +24,7 @@
 
 **不需要任何编程基础**，只要会用鼠标和键盘，按照下面的指南操作即可。
 
-##  如何让代码跑起来（零基础~~草履虫级~~指南）
+##  如何让代码跑起来（零基础 ~~草履虫级~~ 指南）
 
 ### 第一步：安装 Python 3.12
 
@@ -108,7 +109,7 @@ project_root/
 │
 ├── monitor_config.json               # 软件配置文件（保存软件设置）
 ├── README.md                         # 你正在读的这份文档
-├── requirements.txt                  # 依赖库清单
+├── requirements.txt                  # 依赖库清单（是大饼的一部分，目前还没必要有吧~）
 └── .gitignore                        # Git 忽略文件配置
 ```
 
