@@ -4,6 +4,8 @@
  
 > 传承于22届太阳学长（beautiful forever）让我们在整个项目最开始对崇高的太阳kami展示敬意好吗（bushi
 
+> 太阳kami留下的草履虫级飞书文档还是暂时不展示在这里了 谁看谁震撼！ 谁看谁致敬！
+
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 
 
