@@ -40,10 +40,16 @@ class ArduinoSerialMonitor:
 
     def _initialize_attributes(self):
         """
-        初始化所有实例变量。
-
-        包括：文件路径、串口连接状态、数据缓存、反应状态标记、UI变量等。
-        所有属性集中在此初始化，便于统一管理和查阅。
+        [置信度: 高]
+        输入参数详解:
+            无
+        返回值详解:
+            无
+        主要算法逻辑简述:
+            初始化所有实例变量，包括文件路径、串口状态、数据缓存、反应标记等。
+            所有属性集中在此，便于统一管理和查阅。
+        边界条件与限制:
+            变量数量较多，新增时需同步更新 UI 模块的引用。
         """
         # ===== 文件路径相关 =====
         self.csv_filepath = None
@@ -77,33 +83,42 @@ class ArduinoSerialMonitor:
 
         # ===== JSON 专用缓存与状态 =====
         self.reaction_raw_data = []                 # 单次反应的原始数据点列表
-        self.pending_json_state = None              # 待处理的JSON状态标记
+        self.pending_json_state = None              # 待处理的JSON状态标记（'反应开始'/'反应结束'）
+        self.is_json_recording = False              # 是否正在录制JSON数据
+        self.json_start_time = 0.0                  # JSON录制的起始相对时间
 
-        # ===== UI 变量（将在 UI 模块中绑定具体 tk.StringVar 等对象）=====
-        # 这些变量会在 MonitorUI.setup_ui() 中被赋值，此处仅声明
+        # ===== UI 变量占位（将在 MonitorUI.setup_ui() 中被赋值）=====
         self.port_var = None
         self.port_combo = None
         self.baud_var = None
         self.baud_combo = None
         self.connect_button = None
         self.window_var = None
-        self.window_entry = None
-        self.show_plot_var = None
-        self.show_plot_check = None
+        self.is_receiving_var = None
         self.is_frozen_var = None
-        self.frozen_check = None
         self.status_var = None
         self.text_display = None
-        self.hover_info_var = None
+        self.time_slider = None
         self.fig = None
         self.plot = None
         self.canvas = None
+        # 新增绘图图层变量
+        self.line_main = None
+        self.line_base = None
+        self.line_thresh = None
+        self.vline_start = None
+        self.vline_end = None
+        self.crosshair_v = None
+        self.crosshair_h = None
+        self.tooltip = None
+        # 右侧面板变量
         self.experiment_status_var = None
         self.reaction_time_var = None
         self.rt_baseline_var = None
         self.rt_current_var = None
         self.rt_avg_var = None
         self.rt_min_var = None
+        # 框架变量（用于布局管理）
         self.main_frame = None
         self.left_main_frame = None
         self.right_main_frame = None
@@ -111,16 +126,21 @@ class ArduinoSerialMonitor:
         self.left_frame = None
         self.right_frame = None
         self.bottom_frame = None
+        self.slider_frame = None
         self.reaction_display_frame = None
         self.realtime_data_frame = None
 
     def _init_modules(self):
         """
-        初始化各功能模块。
-
-        将 UI、数据处理、串口通信、绘图、配置管理、文件对话框等职责
-        分别委托给专门的模块实例。每个模块通过 `app` 参数持有主类的引用，
-        以便访问共享的数据属性（如 self.data_buffer、self.baseline_light 等）。
+        [置信度: 高]
+        输入参数详解:
+            无
+        返回值详解:
+            无
+        主要算法逻辑简述:
+            实例化各功能模块，并建立方法绑定，使主类对外暴露统一的接口。
+        边界条件与限制:
+            模块间通过 app 参数相互引用，初始化顺序无严格要求。
         """
         # UI 模块：负责所有界面元素的创建和布局
         self.ui = MonitorUI(self)
@@ -141,11 +161,11 @@ class ArduinoSerialMonitor:
         self.file_dialog = FileDialogManager(self)
 
         # 将各模块的关键方法绑定到主类，保持对外接口不变
-        # 这样外部调用 app.refresh_ports() 实际会转发到 serial.refresh_ports()
         self.refresh_ports = self.serial.refresh_ports
         self.toggle_connection = self.serial.toggle_connection
         self.restart_measurement = self.serial.restart_measurement
         self.on_mouse_move = self.ui.on_mouse_move
+        self.on_slider_move = self.ui.on_slider_move
 
 
 if __name__ == "__main__":

@@ -71,7 +71,7 @@ class FileDialogManager:
         """
         filepath = filedialog.asksaveasfilename(
             title="选择新的比赛数据保存位置 (CSV表格)",
-            initialfile="碘钟实验记录_新.csv",
+            initialfile="碘钟实验记录.csv",
             defaultextension=".csv",
             filetypes=[("CSV 文件", "*.csv")]
         )

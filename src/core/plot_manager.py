@@ -10,25 +10,31 @@
 数值画成一条随时间变化的曲线，让你一眼就能看出光强是上升还是下降。
 """
 
+"""
+绘图管理模块（增强版）——负责波形图的绘制和更新
+
+新增功能：多图层管理、滑块控制支持、十字线数据联动。
+"""
+
 import time
+import numpy as np
 
 
 class PlotManager:
     """
-    绘图管理器——负责所有与 matplotlib 绘图相关的逻辑。
+    [置信度: 高]
+    输入参数详解:
+        app: 主应用实例
+    返回值详解:
+        无
+    主要算法逻辑简述:
+        在后台线程中定期刷新绘图，支持动态滚动/冻结/滑块回看模式。
     """
 
-    # 触发百分比常量（与 DataProcessor 保持一致）
     TRIGGER_PERCENT = 0.20
+    DEFAULT_WINDOW_SIZE = 60
 
     def __init__(self, app):
-        """
-        [置信度: 高]
-        输入参数详解:
-            app: ArduinoSerialMonitor 主应用实例
-        返回值详解:
-            无
-        """
         self.app = app
 
     def update_plot_loop(self):
@@ -39,131 +45,81 @@ class PlotManager:
         返回值详解:
             无
         主要算法逻辑简述:
-            在 while 循环中每隔 0.1 秒检查是否需要刷新波形图
+            每隔 60ms 检查是否需要重绘（连接状态下持续重绘）。
         边界条件与限制:
-            - 循环条件为 self.app.is_connected
-            - 仅在 show_plot_var 为 True 时执行重绘
+            重绘频率与系统性能相关，60ms 为经验值。
         """
         while self.app.is_connected:
-            if self.app.show_plot_var.get():
-                self._redraw_plot()
-            time.sleep(0.1)
+            self._redraw_plot()
+            time.sleep(0.06)
 
     def _redraw_plot(self):
-        """
-        [置信度: 高]
-        输入参数详解:
-            无
-        返回值详解:
-            无
-        主要算法逻辑简述:
-            获取当前冻结状态和坐标轴范围，从数据缓存中取出数据，
-            执行绘图，应用坐标轴范围，最后刷新画布
-        边界条件与限制:
-            - 使用线程锁保护对数据缓存的访问
-            - 如果数据缓存为空，跳过本次重绘
-        """
-        is_frozen = self.app.is_frozen_var.get()
-        current_xlim = None
-        current_ylim = None
-
-        if is_frozen:
-            current_xlim = self.app.plot.get_xlim()
-            current_ylim = self.app.plot.get_ylim()
-
+        """执行一次完整的绘图刷新"""
         with self.app.lock:
             x_data = list(self.app.time_data)
             y_data = list(self.app.data_buffer)
 
-        if x_data:
-            self._draw_plot_elements(x_data, y_data)
-            self._apply_axis_limits(x_data, is_frozen, current_xlim, current_ylim)
-            self.app.canvas.draw_idle()
+        if not x_data:
+            return
 
-    def _draw_plot_elements(self, x_data, y_data):
-        """
-        [置信度: 高]
-        输入参数详解:
-            x_data: 时间数据列表
-            y_data: 光强数据列表
-        返回值详解:
-            无
-        主要算法逻辑简述:
-            - 清空画布
-            - 绘制实时光强曲线（蓝色实线）
-            - 如果已标定，绘制环境基准线（绿色虚线）和触发阈值线（红色点划线）
-            - 如果已记录，绘制反应开始线（橙色竖线）和反应结束线（紫色竖线）
-            - 添加图例
-        边界条件与限制:
-            - 触发阈值线仅在 baseline_light 存在时绘制
-        """
-        self.app.plot.clear()
-        self.app.plot.plot(x_data, y_data, 'b-', label='实时光强')
-        self.app.plot.set_xlabel("时间 (秒)")
-        self.app.plot.set_ylabel("光敏传感器读数")
-        self.app.plot.grid(True, linestyle=':', alpha=0.6)
+        # 更新主曲线
+        self.app.line_main.set_data(x_data, y_data)
 
+        # 更新基准线和阈值线
         if self.app.baseline_light is not None:
-            self.app.plot.axhline(
-                y=self.app.baseline_light, color='green', linestyle='--',
-                alpha=0.8, label=f'环境基准 ({self.app.baseline_light})'
-            )
-            threshold = self.app.baseline_light * (1 - self.TRIGGER_PERCENT)
-            self.app.plot.axhline(
-                y=threshold, color='red', linestyle='-.', alpha=0.8,
-                label=f'触发线 (-{int(self.TRIGGER_PERCENT * 100)}%)'
-            )
+            self.app.line_base.set_ydata([self.app.baseline_light, self.app.baseline_light])
+            thresh = self.app.baseline_light * (1 - self.TRIGGER_PERCENT)
+            self.app.line_thresh.set_ydata([thresh, thresh])
+        else:
+            self.app.line_base.set_ydata([np.nan, np.nan])
+            self.app.line_thresh.set_ydata([np.nan, np.nan])
 
+        # 更新竖线
         if self.app.reaction_start_marker:
-            self.app.plot.axvline(
-                x=self.app.reaction_start_marker, color='orange',
-                linewidth=2, label='反应开始'
-            )
+            self.app.vline_start.set_xdata([self.app.reaction_start_marker, self.app.reaction_start_marker])
+        else:
+            self.app.vline_start.set_xdata([np.nan, np.nan])
 
         if self.app.reaction_end_marker:
-            self.app.plot.axvline(
-                x=self.app.reaction_end_marker, color='purple',
-                linewidth=2, label='确认结束'
-            )
-
-        self.app.plot.legend(loc='upper right')
-
-    def _apply_axis_limits(self, x_data, is_frozen, current_xlim, current_ylim):
-        """
-        [置信度: 高]
-        输入参数详解:
-            x_data: 时间数据列表
-            is_frozen: 是否处于冻结模式
-            current_xlim: 冻结前的 X 轴范围（仅在 is_frozen=True 时有效）
-            current_ylim: 冻结前的 Y 轴范围（仅在 is_frozen=True 时有效）
-        返回值详解:
-            无
-        主要算法逻辑简述:
-            - 冻结模式：恢复之前保存的坐标轴范围
-            - 动态模式：根据最新数据时间和用户设置的窗口宽度自动调整 X 轴；
-              Y 轴根据基准光强自动适应
-        边界条件与限制:
-            - 窗口宽度读取失败时默认使用 60 秒
-            - 无基准光强时 Y 轴固定为 [0, 1100]
-        """
-        if is_frozen:
-            self.app.plot.set_xlim(current_xlim)
-            self.app.plot.set_ylim(current_ylim)
+            self.app.vline_end.set_xdata([self.app.reaction_end_marker, self.app.reaction_end_marker])
         else:
-            try:
-                window_size = float(self.app.window_var.get())
-                if window_size <= 0:
-                    window_size = 60
-            except ValueError:
-                window_size = 60
+            self.app.vline_end.set_xdata([np.nan, np.nan])
 
-            latest_time = x_data[-1]
+        # 坐标轴范围管理
+        try:
+            window_size = float(self.app.window_var.get())
+            if window_size <= 0:
+                window_size = self.DEFAULT_WINDOW_SIZE
+        except ValueError:
+            window_size = self.DEFAULT_WINDOW_SIZE
+
+        latest_time = x_data[-1]
+        max_start_time = max(0, latest_time - window_size)
+
+        is_receiving = self.app.is_receiving_var.get()
+        is_frozen = self.app.is_frozen_var.get()
+
+        if is_receiving and not is_frozen:
+            # 动态滚动模式
+            self.app.time_slider.config(state='disabled')
+            self.app.time_slider.configure(to=max_start_time)
+            self.app.time_slider.set(max_start_time)
+
             if latest_time < window_size:
                 self.app.plot.set_xlim(0, window_size)
             else:
-                self.app.plot.set_xlim(latest_time - window_size, latest_time + 2)
+                self.app.plot.set_xlim(max_start_time, latest_time + 2)
+        else:
+            # 冻结或停止接收模式：启用滑块
+            self.app.time_slider.config(state='normal')
+            self.app.time_slider.configure(to=max_start_time)
+            slider_val = self.app.time_slider.get()
+            self.app.plot.set_xlim(slider_val, slider_val + window_size)
 
-            if self.app.baseline_light:
-                self.app.plot.set_ylim(0, max(1100, self.app.baseline_light + 100))
-            else:
-                self.app.plot.set_ylim(0, 1100)
+        # Y轴自适应
+        if self.app.baseline_light:
+            self.app.plot.set_ylim(0, max(1100, self.app.baseline_light + 100))
+        else:
+            self.app.plot.set_ylim(0, 1100)
+
+        self.app.canvas.draw_idle()

@@ -84,7 +84,7 @@ python -m src.main
 
 ## 文件结构说明书
 ```text
-project_root/
+26CEC/
 │
 ├── src/                              # 所有源代码都在这里
 │   ├── main.py                       # 入口文件，从这里启动程序
