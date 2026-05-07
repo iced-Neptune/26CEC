@@ -170,4 +170,4 @@ TRIGGER_PERCENT = 0.20
 | `toggle_connection()`     | serial_handler.py | 像一个“电源开关”   | 点击“连接/断开”按钮时，接通或切断与 Arduino 的通信       |
 | `on_mouse_move()`         | monitor_ui.py     | 像一个“放大镜”     | 鼠标在波形图上移动时，显示该点的时间和光强值             |
 
-## 最后更新：2026 年 4 月 22 日 01：31
+## 最后更新：2026 年 5 月 7 日 14：27
