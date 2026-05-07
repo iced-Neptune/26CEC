@@ -1,54 +1,38 @@
 """
 文件对话框模块——负责文件/目录选择交互
-
-【类比解释】这个模块就像“打开文件的窗口”——当你需要选择
-保存位置时，它弹出系统自带的文件夹选择对话框，让你点几下鼠标就行。
 """
-
 import os
 import csv
 import tkinter as tk
 from tkinter import ttk, filedialog
 
+from src.utils.path_helper import get_app_root
+
 
 class FileDialogManager:
-    """
-    文件对话框管理器——负责所有与用户文件选择相关的交互。
-    """
+    """文件对话框管理器——负责所有与用户文件选择相关的交互。"""
 
     def __init__(self, app):
-        """
-        [置信度: 高]
-        输入参数详解:
-            app: ArduinoSerialMonitor 主应用实例
-        返回值详解:
-            无
-        """
         self.app = app
 
     def ask_json_dir(self) -> None:
         """
-        [置信度: 高]
-        输入参数详解:
-            无
-        返回值详解:
-            无
-        主要算法逻辑简述:
-            弹出文件夹选择对话框，让用户选择 JSON 原始数据的保存目录；
-            如果用户取消选择，则使用当前程序目录作为默认值
-        边界条件与限制:
-            - 选择结果会保存到 self.app.json_dir
-            - 会在日志中显示选择结果
+        弹出文件夹选择对话框，让用户选择 JSON 原始数据的保存目录；
+        取消选择时默认使用 data/json_raw/ 文件夹。
         """
+        initial_dir = get_app_root() / "data" / "json_raw"
+        initial_dir.mkdir(parents=True, exist_ok=True)
+
         self.app.json_dir = filedialog.askdirectory(
-            title="选择存放〖单次反应原始JSON数据〗的文件夹"
+            title="选择存放〖单次反应原始JSON数据〗的文件夹",
+            initialdir=str(initial_dir)
         )
 
         if not self.app.json_dir:
+            self.app.json_dir = str(initial_dir)
             self.app.text_display.insert(
-                tk.END, "⚠️ 未选择JSON保存目录，JSON数据将默认保存在当前程序目录下。\n"
+                tk.END, "⚠️ 未选择JSON保存目录，JSON数据将默认保存在 data/json_raw/ 文件夹下。\n"
             )
-            self.app.json_dir = os.getcwd()
         else:
             self.app.text_display.insert(
                 tk.END, f"系统已就绪，JSON原始数据将保存在: {self.app.json_dir}\n"
@@ -57,20 +41,15 @@ class FileDialogManager:
 
     def create_new_csv(self) -> None:
         """
-        [置信度: 高]
-        输入参数详解:
-            无
-        返回值详解:
-            无
-        主要算法逻辑简述:
-            弹出“另存为”对话框，让用户选择 CSV 文件的保存位置；
-            如果是新文件，自动写入表头；
-            将文件路径保存到配置文件中，并自动触发 JSON 目录选择
-        边界条件与限制:
-            - 如果用户取消选择，self.app.csv_filepath 保持原值
+        弹出“另存为”对话框，让用户选择 CSV 文件的保存位置；
+        默认建议保存在 data/csv_records/ 目录。
         """
+        initial_dir = get_app_root() / "data" / "csv_records"
+        initial_dir.mkdir(parents=True, exist_ok=True)
+
         filepath = filedialog.asksaveasfilename(
             title="选择新的比赛数据保存位置 (CSV表格)",
+            initialdir=str(initial_dir),
             initialfile="碘钟实验记录.csv",
             defaultextension=".csv",
             filetypes=[("CSV 文件", "*.csv")]
@@ -95,16 +74,7 @@ class FileDialogManager:
 
     def ask_save_preference(self) -> None:
         """
-        [置信度: 高]
-        输入参数详解:
-            无
-        返回值详解:
-            无
-        主要算法逻辑简述:
-            弹出对话框询问用户是追加到上次的 CSV 文件还是创建新文件；
-            根据用户选择调用相应的方法
-        边界条件与限制:
-            - 如果上次的文件不存在，则禁用“追加”按钮
+        弹出对话框询问用户是追加到上次的 CSV 文件还是创建新文件。
         """
         config = self.app.config.load_config()
         last_file = config.get("last_file", "")

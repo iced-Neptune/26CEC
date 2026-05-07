@@ -10,6 +10,9 @@ UI 布局与组件创建模块（增强版）
 还增加了“倒车影像”（滑块回看）和“倒车雷达”（气泡提示）。
 """
 
+import matplotlib
+matplotlib.use('TkAgg')          # ← 必须在 import pyplot 之前
+
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 
