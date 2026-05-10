@@ -21,12 +21,6 @@ class FileDialogManager:
         取消选择时默认使用 data/json_raw/ 文件夹。
         """
         initial_dir = get_app_root() / "data" / "json_raw"
-        initial_dir.mkdir(parents=True, exist_ok=True)
-
-        self.app.json_dir = filedialog.askdirectory(
-            title="选择存放〖单次反应原始JSON数据〗的文件夹",
-            initialdir=str(initial_dir)
-        )
 
         if not self.app.json_dir:
             self.app.json_dir = str(initial_dir)
@@ -63,7 +57,7 @@ class FileDialogManager:
                     writer.writerow([
                         "实验时间", "环境基准光强", "开始瞬间光强", "反应中平均光强",
                         "反应中最低光强", "结束瞬间光强", "结束+0.5s光强", "结束+1.0s光强",
-                        "反应耗时(秒)"
+                        "反应耗时(秒)", "vc含量","溶液温度"
                     ])
 
             config = self.app.config.load_config()

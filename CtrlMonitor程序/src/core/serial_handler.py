@@ -33,6 +33,7 @@ import serial.tools.list_ports
 
 
 class SerialHandler:
+
     """
     [置信度: 高]
     输入参数详解:
@@ -65,14 +66,25 @@ class SerialHandler:
                 self.app.is_connected = True
                 self.app.connect_button.config(text="⏹ 断开连接")
                 self.app.status_var.set(f"状态: 已连接至 {self.app.port_var.get()}")
-
-                threading.Thread(target=self._read_serial_loop, daemon=True).start()
-                threading.Thread(target=self.app.plotter.update_plot_loop, daemon=True).start()
+                
+                """
+                设置“锁定视窗(停止滚动)”复选框的选中状态。
+                frozen: True为选中，False为取消选中。
+                """
+                if hasattr(self.app, 'is_frozen_var'):
+                    self.app.is_frozen_var.set(False)
+                    threading.Thread(target=self._read_serial_loop, daemon=True).start()
+                    threading.Thread(target=self.app.plotter.update_plot_loop, daemon=True).start()
 
                 self.restart_measurement()
             except Exception:
                 self.app.status_var.set("连接失败: 检查端口占用")
         else:
+            if hasattr(self.app, 'is_frozen_var'):
+                    self.app.is_frozen_var.set(True)
+                    threading.Thread(target=self._read_serial_loop, daemon=True).start()
+                    threading.Thread(target=self.app.plotter.update_plot_loop, daemon=True).start()
+                    
             self.app.serial_port.close()
             self.app.is_connected = False
             self.app.connect_button.config(text="▶ 连接设备")
@@ -130,6 +142,12 @@ class SerialHandler:
         self.app.pending_json_state = None
         self.app.is_reacting = False
 
+        # 清空 VC 含量和温度输入框
+        if hasattr(self.app, 'vc_var') and self.app.vc_var:
+            self.app.vc_var.set("")
+        if hasattr(self.app, 'tem_var') and self.app.tem_var:
+            self.app.tem_var.set("")
+
         if self.app.is_connected and self.app.serial_port:
             self.app.serial_port.write(b"RESET\n")
 
@@ -161,7 +179,9 @@ class SerialHandler:
                     self.app.end_light,
                     light_05s,
                     light_10s,
-                    self.app.reaction_duration
+                    self.app.reaction_duration,
+                    self.app.vc_var.get() if self.app.vc_var else "N/A",
+                    self.app.tem_var.get() if self.app.tem_var else "N/A"
                 ])
             self.app.text_display.insert(tk.END, "✅ CSV 汇总数据已安全追加！\n")
         except Exception:

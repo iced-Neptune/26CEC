@@ -205,6 +205,16 @@ class MonitorUI:
         ttk.Label(self.app.reaction_display_frame, textvariable=self.app.reaction_time_var,
                   font=("Arial", 28, "bold")).pack(pady=5, padx=10)
 
+        # VC 温度 输入框
+        entry_frame = ttk.Frame(self.app.reaction_display_frame)
+        entry_frame.pack(fill=tk.X, padx=15, pady=5)
+        ttk.Label(entry_frame, text="vc含量", font=("Microsoft YaHei", 10)).pack(side=tk.LEFT)
+        self.app.vc_var = tk.StringVar()
+        ttk.Entry(entry_frame, textvariable=self.app.vc_var, width=10).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Label(entry_frame, text="溶液温度", font=("Microsoft YaHei", 10)).pack(side=tk.LEFT)
+        self.app.tem_var = tk.StringVar()
+        ttk.Entry(entry_frame, textvariable=self.app.tem_var, width=10).pack(side=tk.LEFT, padx=(8, 0))
+
         ttk.Button(self.app.reaction_display_frame, text="♻ 重新标定环境光 (同步开始新JSON)",
                    command=self.app.restart_measurement).pack(fill=tk.X, pady=5, padx=15)
         ttk.Button(self.app.reaction_display_frame, text="⏹ 强制结束并导出当前 JSON",
@@ -285,6 +295,9 @@ class MonitorUI:
         边界条件与限制:
             窗口宽度可能因用户输入无效而回退到默认值60。
         """
+        # 拖动滑块时，通知 PlotManager 不要自动刷新 X 轴
+        if hasattr(self.app, 'plot_manager'):
+            self.app.plot_manager._slider_dragging = True
         if not self.app.is_receiving_var.get() or self.app.is_frozen_var.get():
             try:
                 window_size = float(self.app.window_var.get())
@@ -293,3 +306,6 @@ class MonitorUI:
             start_x = float(val)
             self.app.plot.set_xlim(start_x, start_x + window_size)
             self.app.canvas.draw_idle()
+        # 拖动结束后，短暂延迟后恢复自动刷新
+        if hasattr(self.app, 'plot_manager'):
+            self.app.after(300, lambda: setattr(self.app.plot_manager, '_slider_dragging', False))
