@@ -93,6 +93,9 @@ class ArduinoSerialMonitor:
         self.slider_frame = None
         self.reaction_display_frame = None
         self.realtime_data_frame = None
+        self.vc_var = None
+        self.tem_var = None
+        self.TRIGGER_PERCENT = 0.02  # 反应触发阈值百分比（相对于基准光强）
 
     def _init_modules(self):
         self.ui = MonitorUI(self)
