@@ -135,6 +135,44 @@ class SerialHandler:
 
     def restart_measurement(self):
         """重置测量状态"""
+        # 重置图表相关状态与数据缓存
+        with self.app.lock:
+            self.app.data_buffer.clear()
+            self.app.time_data.clear()
+        self.app.absolute_start_time = time.time()
+        self.app.baseline_light = None
+        self.app.start_light = None
+        self.app.end_light = None
+        self.app.avg_light = None
+        self.app.min_light = 9999
+        self.app.react_sum = 0
+        self.app.react_count = 0
+        if hasattr(self.app, 'line_main') and self.app.line_main:
+            self.app.line_main.set_data([], [])
+        if hasattr(self.app, 'line_base') and self.app.line_base:
+            self.app.line_base.set_ydata([np.nan, np.nan])
+        if hasattr(self.app, 'line_thresh') and self.app.line_thresh:
+            self.app.line_thresh.set_ydata([np.nan, np.nan])
+        if hasattr(self.app, 'vline_start') and self.app.vline_start:
+            self.app.vline_start.set_xdata([np.nan, np.nan])
+        if hasattr(self.app, 'vline_end') and self.app.vline_end:
+            self.app.vline_end.set_xdata([np.nan, np.nan])
+        if hasattr(self.app, 'crosshair_v') and self.app.crosshair_v:
+            self.app.crosshair_v.set_xdata([np.nan, np.nan])
+        if hasattr(self.app, 'crosshair_h') and self.app.crosshair_h:
+            self.app.crosshair_h.set_ydata([np.nan, np.nan])
+        if hasattr(self.app, 'tooltip') and self.app.tooltip:
+            self.app.tooltip.set_alpha(0)
+        if hasattr(self.app, 'plot') and self.app.plot:
+            self.app.plot.set_xlim(0, self.app.plotter.DEFAULT_WINDOW_SIZE if hasattr(self.app, 'plotter') else 60)
+            self.app.plot.set_ylim(0, 1100)
+        if hasattr(self.app, 'time_slider') and self.app.time_slider:
+            self.app.time_slider.config(state='disabled')
+            self.app.time_slider.configure(to=0)
+            self.app.time_slider.set(0)
+        if hasattr(self.app, 'canvas') and self.app.canvas:
+            self.app.canvas.draw_idle()
+
         self.app.reaction_start_marker = None
         self.app.reaction_end_marker = None
         self.app.reaction_time_var.set("-- 秒")
