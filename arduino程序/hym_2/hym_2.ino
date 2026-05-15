@@ -75,6 +75,7 @@ bool hasTriggered = false; // 防止重复触发
 // 标定辅助
 long g_calibSum = 0;
 int g_calibCount = 0;
+int bengstate = 0;
 
 /* ========== 函数声明 ========== */
 void handleStateMachine(uint32_t now);
@@ -99,7 +100,6 @@ void setup()
   pinMode(PINLIGHT, OUTPUT);
   pinMode(PINFA, OUTPUT);
   pinMode(PINBENG, OUTPUT);
-
   digitalWrite(PINLIGHT, LOW);
   digitalWrite(PINFA, LOW);
   digitalWrite(PINBENG, LOW);
@@ -218,26 +218,27 @@ void handleStateWaitingStart(uint32_t now)
   }
   if (digitalRead(PINJIAYEIN) == LOW && !hasTriggered)
   {
-    lastDebounceTime = millis();
-    if ((millis() - lastDebounceTime) > debounceDelay)
+    if (digitalRead(PINJIAYEIN) == LOW)
     {
-      // 状态稳定超过消抖时间
-      if (digitalRead(PINJIAYEIN) == LOW)
+      switch (bengstate)
       {
+      case 0:
         hasTriggered = true;
         digitalWrite(PINLIGHT, HIGH);
         previousMillis = millis();
-        if (millis() - previousMillis >= 3000)
-        {
-          digitalWrite(PINFA, HIGH); // 开阀
-          previousMillis = millis();
-        }
+        bengstate = 1;
+        break;
+      case 1:
         if (millis() - previousMillis >= 500)
         {
           digitalWrite(PINBENG, HIGH); // 开泵
           // 完成后不再动作，保持泵运行
+          bengstate = 2;
         }
+        break;
+      case 2:
         startReaction(now);
+        break;
       }
     }
   }
