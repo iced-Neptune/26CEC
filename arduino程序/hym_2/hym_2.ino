@@ -226,6 +226,7 @@ void handleStateWaitingStart(uint32_t now)
         hasTriggered = true;
         digitalWrite(PINLIGHT, HIGH);
         previousMillis = millis();
+        digitalWrite(PINBENG, HIGH);
         bengstate = 1;
         break;
       case 1:
@@ -237,7 +238,7 @@ void handleStateWaitingStart(uint32_t now)
         }
         break;
       case 2:
-        startReaction(now);
+        
         break;
       }
     }
