@@ -28,6 +28,10 @@ const float END_CONFIRM_TOLERANCE = 1.1;
 const int PIN_BUZZER = 2;
 const int PIN_LIGHT = A4;
 const int PIN_CAR = 12;
+const int PINJIAYEIN = 3;
+const int PINLIGHT = 4; // 指示灯
+const int PINFA = 5;    // 阀
+const int PINBENG = 6;  // 泵
 
 /* ========== 全局变量区 ========== */
 // 状态机枚举
@@ -47,6 +51,8 @@ uint32_t g_calibStartTime = 0;
 uint32_t g_startTime = 0;
 uint32_t g_confirmStart = 0;
 uint32_t g_lastSampleTime = 0;
+uint32_t lastDebounceTime = 0;
+uint32_t debounceDelay = 50; // 消抖时间
 
 // 传感器与基准
 int g_lightRaw = 0;
@@ -63,6 +69,8 @@ uint8_t g_filterIndex = 0;
 bool g_carOn = false;
 int g_confirmLowCount = 0;
 int g_confirmTotalCount = 0;
+unsigned long previousMillis = 0;
+bool hasTriggered = false; // 防止重复触发
 
 // 标定辅助
 long g_calibSum = 0;
@@ -87,6 +95,14 @@ void setup()
   Serial.begin(115200);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_CAR, OUTPUT);
+  pinMode(PINJIAYEIN, INPUT_PULLUP);
+  pinMode(PINLIGHT, OUTPUT);
+  pinMode(PINFA, OUTPUT);
+  pinMode(PINBENG, OUTPUT);
+
+  digitalWrite(PINLIGHT, LOW);
+  digitalWrite(PINFA, LOW);
+  digitalWrite(PINBENG, LOW);
 
   // 初始化滑动平均滤波器
   for (int i = 0; i < FILTER_WINDOW_SIZE; i++)
@@ -96,18 +112,15 @@ void setup()
   }
   g_lightRaw = g_filterTotal / FILTER_WINDOW_SIZE;
 
-  // 传递系统准备信号
   Serial.println("SYSTEM_READY");
-  // 调用标定函数，开始采集环境光基准。传入当前的系统运行毫秒数（millis()）作为标定起始时间。
   startCalibration(millis());
 }
 
 void loop()
 {
-  // 1. 获取当前时间戳
   uint32_t now = millis();
 
-  // 2. 定时采样（每 100 ms）
+  // 每 100ms 采样一次
   if (now - g_lastSampleTime >= SAMPLING_INTERVAL_MS)
   {
     g_lastSampleTime = now;
@@ -116,7 +129,7 @@ void loop()
     handleStateMachine(now);    // 状态机处理
   }
 
-  // 3. 监听并执行重置命令
+  // 监听来自上位机的重置指令（删除 TJC 部分）
   if (Serial.available())
   {
     String cmd = Serial.readString();
@@ -199,18 +212,34 @@ void handleStateCalibrating(uint32_t now)
 // 状态1：等待溶液加入（检测光强跌破开始阈值）
 void handleStateWaitingStart(uint32_t now)
 {
-  static int stableCount = 0; // 局部静态变量，保持连续计数
-  if (g_lightRaw < g_startThreshold)
+  if (digitalRead(PINJIAYEIN) == HIGH)
   {
-    if (++stableCount >= START_CONFIRM_FRAMES)
-    {
-      startReaction(now);
-      stableCount = 0;
-    }
+    digitalWrite(PINLIGHT, LOW);
   }
-  else
+  if (digitalRead(PINJIAYEIN) == LOW && !hasTriggered)
   {
-    stableCount = 0;
+    lastDebounceTime = millis();
+    if ((millis() - lastDebounceTime) > debounceDelay)
+    {
+      // 状态稳定超过消抖时间
+      if (digitalRead(PINJIAYEIN) == LOW)
+      {
+        hasTriggered = true;
+        digitalWrite(PINLIGHT, HIGH);
+        previousMillis = millis();
+        if (millis() - previousMillis >= 3000)
+        {
+          digitalWrite(PINFA, HIGH); // 开阀
+          previousMillis = millis();
+        }
+        if (millis() - previousMillis >= 500)
+        {
+          digitalWrite(PINBENG, HIGH); // 开泵
+          // 完成后不再动作，保持泵运行
+        }
+        startReaction(now);
+      }
+    }
   }
 }
 
