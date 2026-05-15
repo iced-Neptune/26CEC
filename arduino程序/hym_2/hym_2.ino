@@ -70,7 +70,6 @@ bool g_carOn = false;
 int g_confirmLowCount = 0;
 int g_confirmTotalCount = 0;
 unsigned long previousMillis = 0;
-bool hasTriggered = false; // 防止重复触发
 
 // 标定辅助
 long g_calibSum = 0;
@@ -214,7 +213,7 @@ void handleStateCalibrating(uint32_t now)
 // 状态1：等待溶液加入（检测光强跌破开始阈值）
 void handleStateWaitingStart(uint32_t now)
 {
-  if (digitalRead(PINJIAYEIN) == LOW && !hasTriggered)
+  if (digitalRead(PINJIAYEIN) == LOW)
   {
     if (digitalRead(PINJIAYEIN) == LOW)
     {
@@ -223,7 +222,6 @@ void handleStateWaitingStart(uint32_t now)
         switch (bengstate)
         {
         case 0:
-          hasTriggered = true;
           digitalWrite(PINLIGHT, HIGH);
           previousMillis = millis();
           bengstate = 1;
@@ -382,9 +380,16 @@ void keylistener()
 {
   if (digitalRead(PINJIAYEIN) == HIGH)
   {
-    digitalWrite(PINBENG, LOW); // 开泵
-    
+    digitalWrite(PINBENG, LOW); // 关泵
     digitalWrite(PINLIGHT, LOW);
+  }
+  if (digitalRead(PINJIAYEIN) == LOW)
+  {
+    if (millis() - previousMillis >= 30000)
+    {
+      digitalWrite(PINBENG, LOW);
+    }
+    
   }
   // 这里可以添加按键监听逻辑，如果有物理按键需要处理的话
 }
