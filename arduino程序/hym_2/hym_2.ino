@@ -220,27 +220,30 @@ void handleStateWaitingStart(uint32_t now)
   {
     if (digitalRead(PINJIAYEIN) == LOW)
     {
-      switch (bengstate)
+      while (bengstate != 2)
       {
-      case 0:
-        hasTriggered = true;
-        digitalWrite(PINLIGHT, HIGH);
-        previousMillis = millis();
-        bengstate = 1;
-        Serial.println(bengstate);
-        Serial.println(millis() - previousMillis);
-        break;
-      case 1:
-        if (millis() - previousMillis >= 500)
+        switch (bengstate)
         {
-          digitalWrite(PINBENG, HIGH); // 开泵
-          // 完成后不再动作，保持泵运行
-          bengstate = 2;
+        case 0:
+          hasTriggered = true;
+          digitalWrite(PINLIGHT, HIGH);
+          previousMillis = millis();
+          bengstate = 1;
+          Serial.println(bengstate);
+          Serial.println(millis() - previousMillis);
+          break;
+        case 1:
+          if (millis() - previousMillis >= 500)
+          {
+            digitalWrite(PINBENG, HIGH); // 开泵
+            // 完成后不再动作，保持泵运行
+            bengstate = 2;
+          }
+          break;
+        case 2:
+
+          break;
         }
-        break;
-      case 2:
-        
-        break;
       }
     }
   }
