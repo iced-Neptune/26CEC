@@ -226,8 +226,9 @@ void handleStateWaitingStart(uint32_t now)
         hasTriggered = true;
         digitalWrite(PINLIGHT, HIGH);
         previousMillis = millis();
-        digitalWrite(PINBENG, HIGH);
         bengstate = 1;
+        Serial.println(bengstate);
+        Serial.println(millis() - previousMillis);
         break;
       case 1:
         if (millis() - previousMillis >= 500)
