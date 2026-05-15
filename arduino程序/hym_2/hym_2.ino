@@ -31,13 +31,14 @@ const int PIN_CAR = 12;
 
 /* ========== 全局变量区 ========== */
 // 状态机枚举
-enum SystemState {
-  STATE_CALIBRATING,       // 0: 标定环境光
-  STATE_WAITING_START,     // 1: 等待溶液加入
-  STATE_REACTING,          // 2: 反应进行中
-  STATE_CONFIRMING_END,    // 3: 确认反应结束
-  STATE_FINISHED,          // 4: 测量完成
-  STATE_IDLE               // 5: 闲置
+enum SystemState
+{
+  STATE_CALIBRATING,    // 0: 标定环境光
+  STATE_WAITING_START,  // 1: 等待溶液加入
+  STATE_REACTING,       // 2: 反应进行中
+  STATE_CONFIRMING_END, // 3: 确认反应结束
+  STATE_FINISHED,       // 4: 测量完成
+  STATE_IDLE            // 5: 闲置
 };
 SystemState g_state = STATE_CALIBRATING;
 
@@ -81,91 +82,113 @@ void resetSystem();
 void updateLightSensor();
 
 /* ========== setup & loop ========== */
-void setup() {
+void setup()
+{
   Serial.begin(115200);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_CAR, OUTPUT);
 
   // 初始化滑动平均滤波器
-  for (int i = 0; i < FILTER_WINDOW_SIZE; i++) {
+  for (int i = 0; i < FILTER_WINDOW_SIZE; i++)
+  {
     g_filterReadings[i] = analogRead(PIN_LIGHT);
     g_filterTotal += g_filterReadings[i];
   }
   g_lightRaw = g_filterTotal / FILTER_WINDOW_SIZE;
 
+  // 传递系统准备信号
   Serial.println("SYSTEM_READY");
+  // 调用标定函数，开始采集环境光基准。传入当前的系统运行毫秒数（millis()）作为标定起始时间。
   startCalibration(millis());
 }
 
-void loop() {
+void loop()
+{
+  // 1. 获取当前时间戳
   uint32_t now = millis();
 
-  // 每 100ms 采样一次
-  if (now - g_lastSampleTime >= SAMPLING_INTERVAL_MS) {
+  // 2. 定时采样（每 100 ms）
+  if (now - g_lastSampleTime >= SAMPLING_INTERVAL_MS)
+  {
     g_lastSampleTime = now;
-    updateLightSensor();               // 更新 g_lightRaw
-    Serial.println(g_lightRaw);        // 向上位机发送实时光强（格式不变）
-    handleStateMachine(now);           // 状态机处理
+    updateLightSensor();        // 更新 g_lightRaw
+    Serial.println(g_lightRaw); // 向上位机发送实时光强（格式不变）
+    handleStateMachine(now);    // 状态机处理
   }
 
-  // 监听来自上位机的重置指令（删除 TJC 部分）
-  if (Serial.available()) {
+  // 3. 监听并执行重置命令
+  if (Serial.available())
+  {
     String cmd = Serial.readString();
-    if (cmd.indexOf("RESET") >= 0) {
+    if (cmd.indexOf("RESET") >= 0)
+    {
       resetSystem();
     }
   }
 }
 
 /* ========== 状态机实现 ========== */
-void handleStateMachine(uint32_t now) {
-  switch (g_state) {
-    case STATE_CALIBRATING:
-      handleStateCalibrating(now);
-      break;
-    case STATE_WAITING_START:
-      handleStateWaitingStart(now);
-      break;
-    case STATE_REACTING:
-      handleStateReacting(now);
-      break;
-    case STATE_CONFIRMING_END:
-      handleStateConfirmingEnd(now);
-      break;
-    case STATE_FINISHED:
-      handleStateFinished(now);
-      break;
-    case STATE_IDLE:
-      handleStateIdle(now);
-      break;
+void handleStateMachine(uint32_t now)
+{
+  switch (g_state)
+  {
+  case STATE_CALIBRATING:
+    handleStateCalibrating(now);
+    break;
+  case STATE_WAITING_START:
+    handleStateWaitingStart(now);
+    break;
+  case STATE_REACTING:
+    handleStateReacting(now);
+    break;
+  case STATE_CONFIRMING_END:
+    handleStateConfirmingEnd(now);
+    break;
+  case STATE_FINISHED:
+    handleStateFinished(now);
+    break;
+  case STATE_IDLE:
+    handleStateIdle(now);
+    break;
   }
 }
 
 // 状态0：标定环境光（要求光强 > 800 才开始）
-void handleStateCalibrating(uint32_t now) {
+void handleStateCalibrating(uint32_t now)
+{
   // 只有光强大于 800 才允许标定（避免暗环境误标定）
-  if (g_lightRaw > 800) {
-    if (now - g_calibStartTime < CALIBRATION_DURATION_MS) {
+  if (g_lightRaw > 800)
+  {
+    if (now - g_calibStartTime < CALIBRATION_DURATION_MS)
+    {
       // 跳过前 500ms 不稳定数据
-      if (now - g_calibStartTime > CALIBRATION_SKIP_MS) {
+      if (now - g_calibStartTime > CALIBRATION_SKIP_MS)
+      {
         g_calibSum += g_lightRaw;
         g_calibCount++;
       }
-    } else {
+    }
+    else
+    {
       // 标定结束，计算基准线
-      if (g_calibCount > 0) {
+      if (g_calibCount > 0)
+      {
         g_baselineLight = (float)g_calibSum / g_calibCount;
         g_startThreshold = (int)(g_baselineLight * (1.0 - START_PERCENT));
         g_endThreshold = (int)(g_baselineLight * (1.0 - END_PERCENT));
         Serial.println("WAITING_REACTION");
         tone(PIN_BUZZER, 500, 200);
         g_state = STATE_WAITING_START;
-      } else {
+      }
+      else
+      {
         // 极小概率错误，重新标定
         startCalibration(now);
       }
     }
-  } else {
+  }
+  else
+  {
     // 光强不足 800，重置标定计时器，等待强光
     g_calibStartTime = now;
     g_calibSum = 0;
@@ -174,29 +197,38 @@ void handleStateCalibrating(uint32_t now) {
 }
 
 // 状态1：等待溶液加入（检测光强跌破开始阈值）
-void handleStateWaitingStart(uint32_t now) {
-  static int stableCount = 0;   // 局部静态变量，保持连续计数
-  if (g_lightRaw < g_startThreshold) {
-    if (++stableCount >= START_CONFIRM_FRAMES) {
+void handleStateWaitingStart(uint32_t now)
+{
+  static int stableCount = 0; // 局部静态变量，保持连续计数
+  if (g_lightRaw < g_startThreshold)
+  {
+    if (++stableCount >= START_CONFIRM_FRAMES)
+    {
       startReaction(now);
       stableCount = 0;
     }
-  } else {
+  }
+  else
+  {
     stableCount = 0;
   }
 }
 
 // 状态2：反应中（保护期 + 延时发车 + 监测结束条件）
-void handleStateReacting(uint32_t now) {
+void handleStateReacting(uint32_t now)
+{
   // 延时1秒后启动小车
-  if (!g_carOn && (now - g_startTime) >= CAR_DELAY_MS) {
+  if (!g_carOn && (now - g_startTime) >= CAR_DELAY_MS)
+  {
     digitalWrite(PIN_CAR, HIGH);
     g_carOn = true;
   }
 
   // 10秒保护期结束后，监测是否跌破结束阈值
-  if ((now - g_startTime) > PROTECTION_TIME_MS) {
-    if (g_lightRaw < g_endThreshold) {
+  if ((now - g_startTime) > PROTECTION_TIME_MS)
+  {
+    if (g_lightRaw < g_endThreshold)
+    {
       g_confirmStart = now;
       g_confirmLowCount = 0;
       g_confirmTotalCount = 0;
@@ -208,21 +240,27 @@ void handleStateReacting(uint32_t now) {
 }
 
 // 状态3：确认期（防误触，800ms 滤波）
-void handleStateConfirmingEnd(uint32_t now) {
+void handleStateConfirmingEnd(uint32_t now)
+{
   g_confirmTotalCount++;
   // 容错：光强低于 endThreshold * 1.1 即算有效低点（原逻辑保留）
-  if (g_lightRaw < (int)(g_endThreshold * END_CONFIRM_TOLERANCE)) {
+  if (g_lightRaw < (int)(g_endThreshold * END_CONFIRM_TOLERANCE))
+  {
     g_confirmLowCount++;
   }
 
-  if (now - g_confirmStart >= CONFIRM_TIME_MS) {
-    if (g_confirmLowCount >= (g_confirmTotalCount / 2)) {
+  if (now - g_confirmStart >= CONFIRM_TIME_MS)
+  {
+    if (g_confirmLowCount >= (g_confirmTotalCount / 2))
+    {
       // 确认真实变色
       g_state = STATE_FINISHED;
       Serial.print("REACTION_TIME:");
       Serial.print(g_confirmStart - g_startTime);
       Serial.println("ms");
-    } else {
+    }
+    else
+    {
       // 误报，返回反应中状态
       Serial.println("FALSE_ALARM");
       g_state = STATE_REACTING;
@@ -230,18 +268,22 @@ void handleStateConfirmingEnd(uint32_t now) {
   }
 
   // 安全锁：若卡在确认期超过 2*CAR_DELAY_MS，强行停车并进入闲置
-  if (now - g_confirmStart >= (CAR_DELAY_MS * 2)) {
+  if (now - g_confirmStart >= (CAR_DELAY_MS * 2))
+  {
     digitalWrite(PIN_CAR, LOW);
     g_carOn = false;
-    if (g_state == STATE_CONFIRMING_END) {
+    if (g_state == STATE_CONFIRMING_END)
+    {
       g_state = STATE_IDLE;
     }
   }
 }
 
 // 状态4：测量完成，延时停车
-void handleStateFinished(uint32_t now) {
-  if (now - g_confirmStart >= CAR_DELAY_MS) {
+void handleStateFinished(uint32_t now)
+{
+  if (now - g_confirmStart >= CAR_DELAY_MS)
+  {
     digitalWrite(PIN_CAR, LOW);
     g_carOn = false;
     Serial.println("MEASUREMENT_COMPLETE");
@@ -251,13 +293,15 @@ void handleStateFinished(uint32_t now) {
 }
 
 // 状态5：闲置状态，等待 RESET 命令
-void handleStateIdle(uint32_t now) {
+void handleStateIdle(uint32_t now)
+{
   // 无动作，仅等待 resetSystem() 被外部调用
   (void)now; // 避免未使用参数警告
 }
 
 /* ========== 辅助函数 ========== */
-void startCalibration(uint32_t now) {
+void startCalibration(uint32_t now)
+{
   g_state = STATE_CALIBRATING;
   g_calibStartTime = now;
   g_calibSum = 0;
@@ -265,7 +309,8 @@ void startCalibration(uint32_t now) {
   g_baselineLight = 0.0;
 }
 
-void startReaction(uint32_t now) {
+void startReaction(uint32_t now)
+{
   g_startTime = now;
   g_state = STATE_REACTING;
   tone(PIN_BUZZER, 1000, 100);
@@ -273,14 +318,16 @@ void startReaction(uint32_t now) {
   Serial.println(now);
 }
 
-void resetSystem() {
+void resetSystem()
+{
   startCalibration(millis());
   g_carOn = false;
   digitalWrite(PIN_CAR, LOW);
 
   // 重置滤波器历史
   g_filterTotal = 0;
-  for (int i = 0; i < FILTER_WINDOW_SIZE; i++) {
+  for (int i = 0; i < FILTER_WINDOW_SIZE; i++)
+  {
     g_filterReadings[i] = analogRead(PIN_LIGHT);
     g_filterTotal += g_filterReadings[i];
   }
@@ -290,7 +337,8 @@ void resetSystem() {
   Serial.println("SYSTEM_RESET");
 }
 
-void updateLightSensor() {
+void updateLightSensor()
+{
   // 滑动平均滤波，与原始逻辑完全一致
   g_filterTotal -= g_filterReadings[g_filterIndex];
   g_filterReadings[g_filterIndex] = analogRead(PIN_LIGHT);
