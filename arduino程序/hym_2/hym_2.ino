@@ -138,6 +138,8 @@ void loop()
       resetSystem();
     }
   }
+
+  keylistener(); // 监听按键输入（如果有）
 }
 
 /* ========== 状态机实现 ========== */
@@ -212,10 +214,6 @@ void handleStateCalibrating(uint32_t now)
 // 状态1：等待溶液加入（检测光强跌破开始阈值）
 void handleStateWaitingStart(uint32_t now)
 {
-  if (digitalRead(PINJIAYEIN) == HIGH)
-  {
-    digitalWrite(PINLIGHT, LOW);
-  }
   if (digitalRead(PINJIAYEIN) == LOW && !hasTriggered)
   {
     if (digitalRead(PINJIAYEIN) == LOW)
@@ -229,8 +227,6 @@ void handleStateWaitingStart(uint32_t now)
           digitalWrite(PINLIGHT, HIGH);
           previousMillis = millis();
           bengstate = 1;
-          Serial.println(bengstate);
-          Serial.println(millis() - previousMillis);
           break;
         case 1:
           if (millis() - previousMillis >= 500)
@@ -241,7 +237,7 @@ void handleStateWaitingStart(uint32_t now)
           }
           break;
         case 2:
-
+          g_state = STATE_REACTING;
           break;
         }
       }
@@ -380,4 +376,15 @@ void updateLightSensor()
   g_filterTotal += g_filterReadings[g_filterIndex];
   g_filterIndex = (g_filterIndex + 1) % FILTER_WINDOW_SIZE;
   g_lightRaw = g_filterTotal / FILTER_WINDOW_SIZE;
+}
+
+void keylistener()
+{
+  if (digitalRead(PINJIAYEIN) == HIGH)
+  {
+    digitalWrite(PINBENG, LOW); // 开泵
+    
+    digitalWrite(PINLIGHT, LOW);
+  }
+  // 这里可以添加按键监听逻辑，如果有物理按键需要处理的话
 }
