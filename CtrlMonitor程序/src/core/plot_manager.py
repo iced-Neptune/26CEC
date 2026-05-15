@@ -31,11 +31,11 @@ class PlotManager:
         在后台线程中定期刷新绘图，支持动态滚动/冻结/滑块回看模式。
     """
 
-    TRIGGER_PERCENT = 0.20
     DEFAULT_WINDOW_SIZE = 60
 
     def __init__(self, app):
         self.app = app
+        self._slider_dragging = False  # 标志：是否正在拖动滑块
 
     def update_plot_loop(self):
         """
@@ -68,7 +68,7 @@ class PlotManager:
         # 更新基准线和阈值线
         if self.app.baseline_light is not None:
             self.app.line_base.set_ydata([self.app.baseline_light, self.app.baseline_light])
-            thresh = self.app.baseline_light * (1 - self.TRIGGER_PERCENT)
+            thresh = self.app.baseline_light * (1 - self.app.TRIGGER_PERCENT)
             self.app.line_thresh.set_ydata([thresh, thresh])
         else:
             self.app.line_base.set_ydata([np.nan, np.nan])
@@ -113,8 +113,10 @@ class PlotManager:
             # 冻结或停止接收模式：启用滑块
             self.app.time_slider.config(state='normal')
             self.app.time_slider.configure(to=max_start_time)
-            slider_val = self.app.time_slider.get()
-            self.app.plot.set_xlim(slider_val, slider_val + window_size)
+            # 只有未拖动滑块时才自动刷新X轴
+            if not self._slider_dragging:
+                slider_val = self.app.time_slider.get()
+                self.app.plot.set_xlim(slider_val, slider_val + window_size)
 
         # Y轴自适应
         if self.app.baseline_light:

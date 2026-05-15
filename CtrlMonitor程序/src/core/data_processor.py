@@ -16,6 +16,7 @@
 
 import time
 import re
+from tkinter import messagebox
 
 
 class DataProcessor:
@@ -29,8 +30,6 @@ class DataProcessor:
         负责解析串口指令、处理数值数据、更新反应状态。
         所有方法不直接操作 UI，仅修改 app 属性。
     """
-
-    TRIGGER_PERCENT = 0.20
 
     def __init__(self, app):
         self.app = app
@@ -51,6 +50,18 @@ class DataProcessor:
             self.app.experiment_status_var.set("状态: 正在标定环境光强...")
             self.app.calibration_data.clear()
             self.app.serial.start_json_recording()
+            # 检查 VC 含量输入
+            vc_val = self.app.vc_var.get() if hasattr(self.app, 'vc_var') else ""
+            if not vc_val.strip():
+                messagebox.showwarning("缺少信息", "请先输入 vc 含量后再保存数据！")
+                return
+
+            # 检查溶液温度输入
+            tem_val = self.app.tem_var.get() if hasattr(self.app, 'tem_var') else ""
+            if not tem_val.strip():
+                messagebox.showwarning("缺少信息", "请先输入溶液温度后再保存数据！")
+                return
+
 
         elif line.startswith("REACTION_START:"):
             self._handle_reaction_start()
