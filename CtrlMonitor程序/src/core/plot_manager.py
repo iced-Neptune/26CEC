@@ -65,15 +65,6 @@ class PlotManager:
         # 更新主曲线
         self.app.line_main.set_data(x_data, y_data)
 
-        # 更新基准线和阈值线
-        if self.app.baseline_light is not None:
-            self.app.line_base.set_ydata([self.app.baseline_light, self.app.baseline_light])
-            thresh = self.app.baseline_light * (1 - self.app.TRIGGER_PERCENT)
-            self.app.line_thresh.set_ydata([thresh, thresh])
-        else:
-            self.app.line_base.set_ydata([np.nan, np.nan])
-            self.app.line_thresh.set_ydata([np.nan, np.nan])
-
         # 更新竖线
         if self.app.reaction_start_marker:
             self.app.vline_start.set_xdata([self.app.reaction_start_marker, self.app.reaction_start_marker])
