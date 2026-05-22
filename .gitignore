@@ -1,6 +1,6 @@
 __pycache__/
 *.pyc
 
-/data
+/CtrlMonitor程序/config
 
 .vscode
