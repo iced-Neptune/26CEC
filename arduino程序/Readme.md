@@ -1,5 +1,14 @@
 # CHEM_E_CAR 比赛增强版 – 状态机说明文档
 
+## 0. 执行逻辑
+`loop`函数：
+
+1. 获得当前时间 --> `now`
+2. 向上位机发送数据
+3. 状态机处理 `handleStateMachine(now)`
+4. 监听上位机消息
+5. 监按键事件 `keylistener(now)`
+
 ## 1. 状态机总览
 
 系统包含 6 个状态，按顺序流转。状态定义如下：
@@ -24,14 +33,14 @@
   4. 根据 `START_PERCENT` 和 `END_PERCENT` 计算：
      - `startThreshold = baselineLight * (1 - START_PERCENT)`
      - `endThreshold   = baselineLight * (1 - END_PERCENT)`
-  5. 标定完成后蜂鸣一声，切换至 `STATE_WAITING_START`。
 - **不满足光强 > 800**：重置标定计时器，继续等待强光。
 
 ### 状态 1: `STATE_WAITING_START`
 - **进入条件**：标定完成。
 - **执行逻辑**：
-  - 实时监测光强是否 **< startThreshold**。
-  - 为避免抖动，要求连续 **2 帧**（200 ms）均低于阈值才触发。
+  - 按下按钮`PINJIAYEIN`
+  - 等待`beng_wait_time`时间气泵启动
+  - 切换状态
 - **切换条件**：满足上述条件 → 调用 `startReaction()`，切换至 `STATE_REACTING`。
 
 ### 状态 2: `STATE_REACTING`

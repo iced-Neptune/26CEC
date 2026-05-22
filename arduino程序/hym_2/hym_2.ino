@@ -1,6 +1,9 @@
 // CHEM_E_CAR - 比赛增强版 (动态基准线 + 见好就收)
 // MODIFIED: 重构状态机，统一命名风格，删除串口屏，提取常量
 
+#include <stdint.h>
+#include <Arduino.h>
+
 /* ========== 用户可调参数区 ========== */
 // 触发开始的下降比例（光强比环境基准下降 15% 判定为加入溶液）
 const float START_PERCENT = 0.15;
@@ -52,7 +55,6 @@ uint32_t g_startTime = 0;
 uint32_t g_confirmStart = 0;
 uint32_t g_lastSampleTime = 0;
 uint32_t lastDebounceTime = 0;
-uint32_t debounceDelay = 50; // 消抖时间
 
 // 传感器与基准
 int g_lightRaw = 0;
@@ -88,6 +90,7 @@ void startCalibration(uint32_t now);
 void startReaction(uint32_t now);
 void resetSystem();
 void updateLightSensor();
+void keylistener(uint32_t now);
 
 /* ========== setup & loop ========== */
 void setup()
@@ -138,7 +141,7 @@ void loop()
     }
   }
 
-  keylistener(); // 监听按键输入（如果有）
+  keylistener(now); // 监听按键输入（如果有）
 }
 
 /* ========== 状态机实现 ========== */
@@ -223,7 +226,7 @@ void handleStateWaitingStart(uint32_t now)
         {
         case 0:
           digitalWrite(PINLIGHT, HIGH);
-          previousMillis = millis();
+          previousMillis = now;
           bengstate = 1;
           break;
         case 1:
@@ -236,6 +239,7 @@ void handleStateWaitingStart(uint32_t now)
           break;
         case 2:
           g_state = STATE_REACTING;
+          Serial.println("WAITING_REACTION:" + String(now));
           break;
         }
       }
@@ -376,20 +380,22 @@ void updateLightSensor()
   g_lightRaw = g_filterTotal / FILTER_WINDOW_SIZE;
 }
 
-void keylistener()
+void keylistener(uint32_t now)
 {
   if (digitalRead(PINJIAYEIN) == HIGH)
   {
     digitalWrite(PINBENG, LOW); // 关泵
     digitalWrite(PINLIGHT, LOW);
+    bengstate = 0;
   }
   if (digitalRead(PINJIAYEIN) == LOW)
   {
-    if (millis() - previousMillis >= 30000)
+    digitalWrite(PINLIGHT, HIGH);
+    if (now - previousMillis >= 30000)
+    // 30秒后关泵
     {
       digitalWrite(PINBENG, LOW);
     }
-    
-  }
+    }
   // 这里可以添加按键监听逻辑，如果有物理按键需要处理的话
 }
