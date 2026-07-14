@@ -53,13 +53,15 @@ class DataProcessor:
             # 检查 VC 含量输入
             vc_val = self.app.vc_var.get() if hasattr(self.app, 'vc_var') else ""
             if not vc_val.strip():
-                messagebox.showwarning("缺少信息", "请先输入 vc 含量后再保存数据！")
+                # messagebox.showwarning("缺少信息", "请先输入 vc 含量后再保存数据！")
+                pass
                 return
 
             # 检查溶液温度输入
             tem_val = self.app.tem_var.get() if hasattr(self.app, 'tem_var') else ""
             if not tem_val.strip():
-                messagebox.showwarning("缺少信息", "请先输入溶液温度后再保存数据！")
+                # messagebox.showwarning("缺少信息", "请先输入溶液温度后再保存数据！")
+                pass
                 return
 
 

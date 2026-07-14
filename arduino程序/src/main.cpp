@@ -1,14 +1,17 @@
-// CHEM_E_CAR - 比赛增强版 (动态基准线 + 见好就收)
-// MODIFIED: 重构状态机，统一命名风格，删除串口屏，提取常量
 
 #include <stdint.h>
 #include <Arduino.h>
+#include <SoftwareSerial.h>
 
 /* ========== 用户可调参数区 ========== */
 // 触发开始的下降比例（光强比环境基准下降 15% 判定为加入溶液）
 const float START_PERCENT = 0.15;
 // 触发结束的下降比例（"见好就收"，下降 25% 立即停车）
 const float END_PERCENT = 0.25;
+//泵持续时间（毫秒）
+const uint32_t beng_constant_time = 10000;
+//泵启动等待时间（毫秒）
+const uint32_t beng_wait_time = 2000;
 // 小车延迟启动/停止时间 (毫秒)
 const uint32_t CAR_DELAY_MS = 1000;
 // 反应保护期 (10秒内忽略光强变化)
@@ -28,13 +31,18 @@ const uint8_t START_CONFIRM_FRAMES = 2;
 // 结束确认容错系数 (允许光强低于 endThreshold * 1.1 就算有效)
 const float END_CONFIRM_TOLERANCE = 1.1;
 /* ========== 引脚定义区 ========== */
-const int PIN_BUZZER = 2;
-const int PIN_LIGHT = A4;
-const int PIN_CAR = 12;
-const int PINJIAYEIN = 3;
+const int PIN_BUZZER = 2;//蜂鸣器
+const int PIN_LIGHT = A4;//光线传感器
+const int PIN_CAR = 7;//小车控制 高电平启动
+const int PINJIAYEIN = 3;//加液启动按钮
 const int PINLIGHT = 4; // 指示灯
 const int PINFA = 5;    // 阀
 const int PINBENG = 6;  // 泵
+//无线模块引脚tx rx需要反接，使用ttl串口控制，指令AT开头
+//默认设置 接收端地址：0xA1,0xBB,0xCC,0xDD,0xEE
+//       发送端地址：0xA2,0xBB,0xCC,0xDD,0xEE
+//       速率为1即250kbps，波特率为115200
+
 
 /* ========== 全局变量区 ========== */
 // 状态机枚举
@@ -56,6 +64,7 @@ uint32_t g_confirmStart = 0;
 uint32_t g_lastSampleTime = 0;
 uint32_t lastDebounceTime = 0;
 
+
 // 传感器与基准
 int g_lightRaw = 0;
 float g_baselineLight = 0.0;
@@ -71,7 +80,7 @@ uint8_t g_filterIndex = 0;
 bool g_carOn = false;
 int g_confirmLowCount = 0;
 int g_confirmTotalCount = 0;
-unsigned long previousMillis = 0;
+unsigned long previousMillis = 0;//临时储存设备启动时间
 
 // 标定辅助
 long g_calibSum = 0;
@@ -91,6 +100,7 @@ void startReaction(uint32_t now);
 void resetSystem();
 void updateLightSensor();
 void keylistener(uint32_t now);
+void sendLightFrame(int value);
 
 /* ========== setup & loop ========== */
 void setup()
@@ -105,6 +115,7 @@ void setup()
   digitalWrite(PINLIGHT, LOW);
   digitalWrite(PINFA, LOW);
   digitalWrite(PINBENG, LOW);
+  digitalWrite(PIN_CAR, LOW);
 
   // 初始化滑动平均滤波器
   for (int i = 0; i < FILTER_WINDOW_SIZE; i++)
@@ -127,8 +138,8 @@ void loop()
   {
     g_lastSampleTime = now;
     updateLightSensor();        // 更新 g_lightRaw
-    Serial.println(g_lightRaw); // 向上位机发送实时光强（格式不变）
     handleStateMachine(now);    // 状态机处理
+    Serial.println(g_lightRaw); // 向上位机发送实时光强（格式不变）
   }
 
   // 监听来自上位机的重置指令（删除 TJC 部分）
@@ -220,8 +231,7 @@ void handleStateWaitingStart(uint32_t now)
   {
     if (digitalRead(PINJIAYEIN) == LOW)
     {
-      while (bengstate != 2)
-      {
+      
         switch (bengstate)
         {
         case 0:
@@ -230,7 +240,7 @@ void handleStateWaitingStart(uint32_t now)
           bengstate = 1;
           break;
         case 1:
-          if (millis() - previousMillis >= 500)
+          if (now - previousMillis >= beng_wait_time)
           {
             digitalWrite(PINBENG, HIGH); // 开泵
             // 完成后不再动作，保持泵运行
@@ -238,13 +248,12 @@ void handleStateWaitingStart(uint32_t now)
           }
           break;
         case 2:
-          g_state = STATE_REACTING;
-          Serial.println("WAITING_REACTION:" + String(now));
+          startReaction(now);
           break;
         }
       }
     }
-  }
+  
 }
 
 // 状态2：反应中（保护期 + 延时发车 + 监测结束条件）
@@ -254,6 +263,7 @@ void handleStateReacting(uint32_t now)
   if (!g_carOn && (now - g_startTime) >= CAR_DELAY_MS)
   {
     digitalWrite(PIN_CAR, HIGH);
+    Serial.println("CAR_STARTED");
     g_carOn = true;
   }
 
@@ -320,6 +330,7 @@ void handleStateFinished(uint32_t now)
     digitalWrite(PIN_CAR, LOW);
     g_carOn = false;
     Serial.println("MEASUREMENT_COMPLETE");
+    Serial.println(now - g_startTime);
     // 删除所有串口屏代码（原 sprintf + TJC.print 已移除）
     g_state = STATE_IDLE;
   }
@@ -347,8 +358,7 @@ void startReaction(uint32_t now)
   g_startTime = now;
   g_state = STATE_REACTING;
   tone(PIN_BUZZER, 1000, 100);
-  Serial.print("REACTION_START:");
-  Serial.println(now);
+  Serial.print("REACTION_START:" + String(now));
 }
 
 void resetSystem()
@@ -380,6 +390,21 @@ void updateLightSensor()
   g_lightRaw = g_filterTotal / FILTER_WINDOW_SIZE;
 }
 
+void sendLightFrame(int value)
+{
+  // 帧格式: [len][payload...], len 为 payload 字节数 (1-31)
+  char payload[16];
+  int len = snprintf(payload, sizeof(payload), "%d", value);
+  if (len <= 0)
+  {
+    return;
+  }
+  if (len > 31)
+  {
+    len = 31;
+  }
+}
+
 void keylistener(uint32_t now)
 {
   if (digitalRead(PINJIAYEIN) == HIGH)
@@ -387,12 +412,16 @@ void keylistener(uint32_t now)
     digitalWrite(PINBENG, LOW); // 关泵
     digitalWrite(PINLIGHT, LOW);
     bengstate = 0;
+    if (g_state != STATE_CALIBRATING && g_state != STATE_WAITING_START && g_state != STATE_REACTING)
+    {
+      g_state = STATE_CALIBRATING;
+      Serial.println("SYSTEM_RESET");
+    } //按钮复位时自动复位程序
   }
   if (digitalRead(PINJIAYEIN) == LOW)
   {
     digitalWrite(PINLIGHT, HIGH);
-    if (now - previousMillis >= 30000)
-    // 30秒后关泵
+    if (now - previousMillis >= beng_constant_time)
     {
       digitalWrite(PINBENG, LOW);
     }
